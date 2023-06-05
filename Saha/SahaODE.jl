@@ -75,3 +75,12 @@ result_neuralode = Optimization.solve(optprob,
 
 callback(result_neuralode.u, loss(result_neuralode.u)...; doplot=true)
 savefig("Saha_Output")
+
+### ADDITIONAL STUFF
+## Test Loss
+function test_loss(p)
+    network_xₑ = probe_network(p)
+    return sum(abs2, network_xₑ .- training_xₑ)
+end
+
+Zygote.gradient(test_loss, prams)
