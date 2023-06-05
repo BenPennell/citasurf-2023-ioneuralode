@@ -1,4 +1,4 @@
-using Plots, DiffEqFlux, Flux, DifferentialEquations, Optimization, OptimizationOptimisers, OptimizationOptimJL
+using Plots, DiffEqFlux, Flux, DifferentialEquations, Optimization, OptimizationOptimisers
 
 ### THE DATA
 SAMPLE_SIZE = 20
@@ -24,7 +24,7 @@ asteps = range(aspan[1], aspan[2], length=SAMPLE_SIZE);
 training_xₑ = Array(xₑ.(asteps)); # Training xₑ
 
 ### THE NETWORK
-NETWORK_SIZE = 16
+NETWORK_SIZE = 5
 ITERATION_COUNT = 1000
 u0 = 0.99f0
 
@@ -70,7 +70,7 @@ optf = Optimization.OptimizationFunction((x, p) -> loss(x), adtype);
 optprob = Optimization.OptimizationProblem(optf, prams);
 
 result_neuralode = Optimization.solve(optprob,
-                                        Flux.Optimisers.RAdam(100.0, (0.6, 0.8)),
+                                        ADAM(100.0, (0.6, 0.8)),
                                         callback = callback,
                                         maxiters = 2000);
 
