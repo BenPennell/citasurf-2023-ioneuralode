@@ -64,7 +64,6 @@ callback = function (ps, test_loss, test_output; doplot=true)
 end
 
 ### THE SOLVER
-#res = DiffEqFlux.sciml_train(loss, prams, ADAM(0.1), cb=callback, maxiters=1000)
 adtype = Optimization.AutoZygote();
 optf = Optimization.OptimizationFunction((x, p) -> loss(x), adtype);
 optprob = Optimization.OptimizationProblem(optf, prams);
