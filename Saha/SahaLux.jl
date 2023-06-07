@@ -32,11 +32,12 @@ asteps = range(aspan[1], aspan[2], length=SAMPLE_SIZE);
 training_xₑ = Array(xₑ.(asteps)); # Training xₑ
 
 ### NETWORK
-NETWORK_SIZE = 20
+NETWORK_SIZE = 5
 
-network_u = Lux.Chain(Lux.Dense(2, NETWORK_SIZE, tanh),
-                        Lux.Dense(NETWORK_SIZE, NETWORK_SIZE, tanh),
-                        Lux.Dense(NETWORK_SIZE, 2));
+rbf(x) = exp.(-(x .^ 2))
+
+network_u = Lux.Chain(Lux.Dense(2, NETWORK_SIZE, rbf), Lux.Dense(NETWORK_SIZE, NETWORK_SIZE, rbf), 
+                        Lux.Dense(NETWORK_SIZE, NETWORK_SIZE, rbf), Lux.Dense(NETWORK_SIZE, 2))
 
 p, st = Lux.setup(rng, network_u);
 
@@ -44,7 +45,7 @@ function ude!(du, u, p, t)
     u[2] = t
     û = network_u(u, p, st)[1]
     du[1] = u[1] + û[1]
-    du[2] = 0
+    du[2] = 1
 end
 
 ivp = ODEProblem{true}(ude!, [0.99, 0], aspan, p);
@@ -66,8 +67,32 @@ end
 Zygote.gradient(loss, ComponentVector{Float64}(p))
 
 ### TRAIN THAT 
-loss_values = [];
+losses = [];
 
+## Documentation callback
+callback = function (p, l)
+    push!(losses, l)
+    if length(losses) % 50 == 0
+        println("Current loss after $(length(losses)) iterations: $(losses[end])")
+    end
+    return false
+end
+
+adtype = Optimization.AutoZygote();
+optf = Optimization.OptimizationFunction((x, p) -> loss(x), adtype);
+optprob = Optimization.OptimizationProblem(optf, ComponentVector{Float64}(p));
+
+res1 = Optimization.solve(optprob, ADAM(100.0, (0.6, 0.8)), callback = callback, maxiters = 3000)
+
+function check_network()
+    plt = plot(asteps, training_xₑ, label = "Training xₑ")
+    scatter!(plt, asteps, probe_network(res1.u), label = "Network xₑ")
+    display(Plots.plot(plt))
+end
+
+check_network()
+## OLD CALLBACK
+```
 callback = function (ps, test_loss, test_output; doplot=true)
     # Plot at every training step
     println(test_loss)
@@ -80,9 +105,4 @@ callback = function (ps, test_loss, test_output; doplot=true)
     end
     return false
 end
-
-adtype = Optimization.AutoZygote();
-optf = Optimization.OptimizationFunction((x, p) -> loss(x), adtype);
-optprob = Optimization.OptimizationProblem(optf, ComponentVector{Float64}(p));
-
-res1 = Optimization.solve(optprob, ADAM(), callback = callback, maxiters = 1000)
+```
