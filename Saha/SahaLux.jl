@@ -37,14 +37,13 @@ NETWORK_SIZE = 20
 rbf(x) = exp.(-(x .^ 2))
 
 network_u = Lux.Chain(Lux.Dense(2, NETWORK_SIZE, rbf), Lux.Dense(NETWORK_SIZE, NETWORK_SIZE, rbf), 
-                        Lux.Dense(NETWORK_SIZE, NETWORK_SIZE, rbf), Lux.Dense(NETWORK_SIZE, 2))
+                        Lux.Dense(NETWORK_SIZE, NETWORK_SIZE, rbf), Lux.Dense(NETWORK_SIZE, 1))
 
 p, st = Lux.setup(rng, network_u);
 
 function ude!(du, u, p, t)
     û = network_u([u[1], t], p, st)[1]
     du[1] = u[1] + û[1]
-    du[2] = 1
 end
 
 ivp = ODEProblem{true}(ude!, [0.99, 0], aspan, p);
@@ -77,7 +76,7 @@ end
 optf = Optimization.OptimizationFunction((x, p) -> loss(x), Optimization.AutoForwardDiff());
 optprob = Optimization.OptimizationProblem(optf, ComponentVector{Float64}(p));
 
-res1 = Optimization.solve(optprob, ADAM(1000.0, (0.6, 0.8)), callback = callback, maxiters = 1000)
+res1 = Optimization.solve(optprob, ADAM(100.0, (0.8, 0.9)), callback = callback, maxiters = 1000)
 
 function check_network()
     plt = plot(asteps, training_xₑ, label = "Training xₑ")
