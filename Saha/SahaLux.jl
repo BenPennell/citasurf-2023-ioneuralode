@@ -32,7 +32,7 @@ asteps = range(aspan[1], aspan[2], length=SAMPLE_SIZE);
 training_xₑ = Array(xₑ.(asteps)); # Training xₑ
 
 ### NETWORK
-NETWORK_SIZE = 5
+NETWORK_SIZE = 20
 
 rbf(x) = exp.(-(x .^ 2))
 
@@ -42,8 +42,7 @@ network_u = Lux.Chain(Lux.Dense(2, NETWORK_SIZE, rbf), Lux.Dense(NETWORK_SIZE, N
 p, st = Lux.setup(rng, network_u);
 
 function ude!(du, u, p, t)
-    u[2] = t
-    û = network_u(u, p, st)[1]
+    û = network_u([u[1], t], p, st)[1]
     du[1] = u[1] + û[1]
     du[2] = 1
 end
@@ -63,9 +62,6 @@ function loss(p)
     return sum(abs2, network_xₑ .- training_xₑ)
 end
 
-## ----> DOES THE GRADIENT WORK????
-Zygote.gradient(loss, ComponentVector{Float64}(p))
-
 ### TRAIN THAT 
 losses = [];
 
@@ -78,11 +74,10 @@ callback = function (p, l)
     return false
 end
 
-adtype = Optimization.AutoZygote();
-optf = Optimization.OptimizationFunction((x, p) -> loss(x), adtype);
+optf = Optimization.OptimizationFunction((x, p) -> loss(x), Optimization.AutoForwardDiff());
 optprob = Optimization.OptimizationProblem(optf, ComponentVector{Float64}(p));
 
-res1 = Optimization.solve(optprob, ADAM(100.0, (0.6, 0.8)), callback = callback, maxiters = 3000)
+res1 = Optimization.solve(optprob, ADAM(1000.0, (0.6, 0.8)), callback = callback, maxiters = 1000)
 
 function check_network()
     plt = plot(asteps, training_xₑ, label = "Training xₑ")
@@ -96,7 +91,7 @@ check_network()
 callback = function (ps, test_loss, test_output; doplot=true)
     # Plot at every training step
     println(test_loss)
-    push!(loss_values, test_loss)
+    push!(losses, test_loss)
     if doplot
         plt = plot(asteps, training_xₑ, label = "Training xₑ", title=test_loss)
         scatter!(plt, asteps, test_output, label = "Network xₑ")
