@@ -7,7 +7,6 @@ gr()
 # Set a random seed for reproducible behaviour
 rng = StableRNG(1111)
 
-
 ### THE DATA
 SAMPLE_SIZE = 20
 Tᵧ = 0.000273f0 # kelvin * 10^4
@@ -85,18 +84,3 @@ function check_network()
 end
 
 check_network()
-## OLD CALLBACK
-```
-callback = function (ps, test_loss, test_output; doplot=true)
-    # Plot at every training step
-    println(test_loss)
-    push!(losses, test_loss)
-    if doplot
-        plt = plot(asteps, training_xₑ, label = "Training xₑ", title=test_loss)
-        scatter!(plt, asteps, test_output, label = "Network xₑ")
-
-        display(Plots.plot(plt))
-    end
-    return false
-end
-```
