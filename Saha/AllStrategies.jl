@@ -29,7 +29,7 @@ function xₑseries(aseries)
 end
 
 ### BATCHES OF DATA
-const BATCH_COUNT = 5
+BATCH_COUNT::Int = 5
 
 a₀ = Float64(1f0/(1f0+z(T₀)))
 a₁ = Float64(1f0/(1f0+1140.f0))
@@ -48,11 +48,11 @@ astep_series = range.(aspan_series[1], aspan_series[2], length=SAMPLE_SIZE)
 training_series = xₑseries.(astep_series)
 
 ### NETWORK
-const NETWORK_SIZE = 25
+NETWORK_SIZE::Int = 25
 
 rbf(x) = exp.(-(x .^ 2))
 
-network_u = Lux.Chain(Lux.Dense(2, NETWORK_SIZE, rbf), Lux.Dense(NETWORK_SIZE, NETWORK_SIZE, rbf), 
+const network_u = Lux.Chain(Lux.Dense(2, NETWORK_SIZE, rbf), Lux.Dense(NETWORK_SIZE, NETWORK_SIZE, rbf), 
                         Lux.Dense(NETWORK_SIZE, NETWORK_SIZE, rbf), Lux.Dense(NETWORK_SIZE, 2));
 
 p, st = Lux.setup(rng, network_u);
