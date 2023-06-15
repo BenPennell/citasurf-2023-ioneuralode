@@ -28,7 +28,7 @@ training_xₑ = Array(xₑ.(asteps)); # Training xₑ
 ### NETWORK
 NETWORK_SIZE = 20
 
-increase(x) = x * 100
+increase(x) = x .* 100
 
 network_u = Lux.Chain(Lux.Dense(2, NETWORK_SIZE, tanh), 
                         Lux.Dense(NETWORK_SIZE, NETWORK_SIZE, tanh), 
