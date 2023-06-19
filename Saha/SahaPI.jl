@@ -1,6 +1,6 @@
 using OrdinaryDiffEq, Optimization, OptimizationOptimisers, OptimizationOptimJL
 using ComponentArrays, Lux, Plots, StableRNGs
-rng = StableRNG(1111)
+rng = StableRNG(1111);
 
 ### THE DATA
 SAMPLE_SIZE = 20
@@ -28,20 +28,21 @@ training_xₑ = Array(xₑ.(asteps)); # Training xₑ
 ### NETWORK
 NETWORK_SIZE = 20
 
-increase(x) = x .* 100
-
 network_u = Lux.Chain(Lux.Dense(2, NETWORK_SIZE, tanh), 
                         Lux.Dense(NETWORK_SIZE, NETWORK_SIZE, tanh), 
-                        Lux.Dense(NETWORK_SIZE, 1, increase));
+                        Lux.Dense(NETWORK_SIZE, NETWORK_SIZE, tanh),
+                        Lux.Dense(NETWORK_SIZE, NETWORK_SIZE, tanh),
+                        Lux.Dense(NETWORK_SIZE, NETWORK_SIZE, tanh),
+                        Lux.Dense(NETWORK_SIZE, 1));
 
 p, st = Lux.setup(rng, network_u);
 
 function ude!(du, u, p, t)
-    û = network_u([u[1], t], p, st)[1]
+    û = network_u([u[1], t], p, st)[1] * 1f3
     du[1] = u[1] + û[1]
 end
 
-ivp = ODEProblem{true}(ude!, [0.99, 0], aspan, p);
+ivp = ODEProblem{true}(ude!, [training_xₑ[1], 0], aspan, p);
 
 function probe_network(p)
     updated_ivp = remake(ivp, p=p)
@@ -53,25 +54,25 @@ function loss(p)
     return sum(abs2, network_xₑ .- training_xₑ)
 end
 
+loss(p)
+
 ### TRAIN THAT 
 losses = [];
 
 callback = function (p, l)
     push!(losses, l)
-    if length(losses) % 50 == 0
-        println("Current loss after $(length(losses)) iterations: $(losses[end])")
-    end
+    println("Current loss after $(length(losses)) iterations: $(losses[end])")
     return false
 end
 
 optf = Optimization.OptimizationFunction((x, p) -> loss(x), Optimization.AutoForwardDiff());
 optprob = Optimization.OptimizationProblem(optf, ComponentVector{Float64}(p));
 
-result_node1 = Optimization.solve(optprob, ADAM(100.0), callback=callback, maxiters=500);
+result_node1 = Optimization.solve(optprob, ADAM(0.01), callback=callback, maxiters=500);
 
 optprob2 = remake(optprob,u0 = result_node1.u);
 
-result_node2 = Optimization.solve(optprob2, ADAM(0.1), callback=callback, maxiters=1000);
+result_node2 = Optimization.solve(optprob2, ADAM(0.0001), callback=callback, maxiters=500);
 
 optprob3 = remake(optprob2, u0 = result_node2.u);
 
@@ -84,4 +85,4 @@ function check_network(result)
     display(Plots.plot(plt))
 end
 
-check_network(result_node1)
+check_network(result_node3)
