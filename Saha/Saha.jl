@@ -21,6 +21,7 @@ z₀::Float64 = 1575.
 z₁::Float64 = 1140.
 
 ### THE DATA
+a(z) = 1/(1 + z)
 β(T) = α * T^(-1.5) * exp(-15.8/T) # Righthand side of Saha
 T₄(a) = Tᵧ * (1/a) # kelvin * 10^4
 
@@ -31,7 +32,7 @@ function xₑ(a)
     return (0.5) * (-β₄ + (β₄^2 + 4*β₄)^(0.5))
 end
 
-aspan = (1/(1 + z₀), 1/(1 + z₁));
+aspan = (a(z₀), a(z₁));
 asteps = range(aspan[1], aspan[2], length=SAMPLE_SIZE);
 training_xₑ = Array(xₑ.(asteps));
 
