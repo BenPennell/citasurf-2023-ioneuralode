@@ -2,36 +2,26 @@ using OrdinaryDiffEq, Optimization, OptimizationOptimisers, OptimizationOptimJL
 using ComponentArrays, Lux, Plots, StableRNGs, JSON
 
 ### HYPERPARAMETERS
-RNG_SEED::Int = 1111
+RNG_SEED::Int = 1112
 NETWORK_SIZE::Int = 25
+LEARNING_RATE::Float64 = 0.005
+ITERATIONS::Int = 200
 
 rng = StableRNG(RNG_SEED);
 
-### IDK
-function characteristic_length(series)
-    return (maximum!([1.,], series)[1] - minimum!([1.,], series)[1])
-end
-
-function norm_const(series)
-    return abs(maximum!([1.,], series)[1])
-end
-
 ### DATA
 data = JSON.parsefile("./Saha++/RecfastData.json"); # He, a, H, T4
+original_data = [ Float64.(data[s]) for s in ("H", "He", "T4") ];
 
-original_data = [Float64.(data["H"]), Float64.(data["He"]), Float64.(data["T4"])]; # There must be a better way to get Float 64s
-
-# The idea here is that we will train on normalized data
-# Re-multiply by norm_consts to get original data
-norm_consts = norm_const.(original_data);
+norm_consts = first.(maximum!.([[1.,]], original_data));
 training_data = original_data ./ norm_consts;
 
 asteps = data["a"];
 aspan = (first(asteps), last(asteps));
 
-characteristic_ascale = 1 / characteristic_length(asteps)
+characteristic_ascale = 1 / (aspan[2] - aspan[1])
 
-### THE NETWORK
+### NETWORK
 network_u = Lux.Chain(Lux.Dense(4, NETWORK_SIZE, tanh), 
                         Lux.Dense(NETWORK_SIZE, NETWORK_SIZE, tanh), 
                         Lux.Dense(NETWORK_SIZE, NETWORK_SIZE, tanh),
@@ -51,7 +41,7 @@ ivp = ODEProblem{true}(ude!, u0, aspan, p);
 
 function probe_network(p)
     solution = solve(remake(ivp, p=p), Tsit5(), saveat=asteps)
-    promoted = [solution[1,:], solution[2,:], solution[3,:]] # How can I do this better?
+    promoted = [ solution[s,:] for s in 1:1:3 ]
     return promoted
 end
 
@@ -73,8 +63,7 @@ end
 
 optf = Optimization.OptimizationFunction((x, p) -> loss(x), Optimization.AutoForwardDiff());
 optprob = Optimization.OptimizationProblem(optf, ComponentVector{Float64}(p));
-# Speed of the network is really reliant on these learning rates. This is all just chosen via trial and error, and I don't like that
-result_node1 = Optimization.solve(optprob, ADAM(0.01), callback=callback, maxiters=100);
+result_node1 = Optimization.solve(optprob, ADAM(LEARNING_RATE), callback=callback, maxiters=ITERATIONS);
 optprob2 = remake(optprob,u0 = result_node1.u);
 result_node2 = Optimization.solve(optprob2, ADAM(0.0003), callback=callback, maxiters=300);
 optprob3 = remake(optprob,u0 = result_node2.u);
