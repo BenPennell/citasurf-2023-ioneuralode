@@ -1,10 +1,10 @@
-using OrdinaryDiffEq, Optimization, OptimizationOptimisers, OptimizationOptimJL
+using OrdinaryDiffEq, Optimization, OptimizationOptimisers, OptimizationOptimJL, SciMLSensitivity
 using ComponentArrays, Lux, Plots, StableRNGs, JSON
 using Zygote, StaticArrays
 
 ### HYPERPARAMETERS
 RNG_SEED::Int = 1112
-NETWORK_SIZE::Int = 25
+NETWORK_SIZE::Int = 10
 LEARNING_RATE::Float64 = 0.005
 ITERATIONS::Int = 200
 
@@ -32,7 +32,7 @@ network_u = Lux.Chain(Lux.Dense(4, NETWORK_SIZE, tanh),
 p, st = Lux.setup(rng, network_u);
 
 function ude(u, p, t)
-    û = network_u(SA[u[1], u[2], u[3], t], p, st)[1] .* characteristic_ascale # Scale to datascale
+    û = network_u(SA[u[1], u[2], u[3], t], p, st)[1] .* [characteristic_ascale, characteristic_ascale*10, characteristic_ascale]  # Scale to datascale
     du1 = u[1] + û[1]
     du2 = u[2] + û[2]
     du3 = u[3] + û[3]
@@ -42,7 +42,6 @@ end
 
 u0 = first.(training_data)
 ivp = ODEProblem{false}(ude, SA[u0[1], u0[2], u0[3], 0.], aspan, p);
-sol = solve(ivp, Tsit5(), saveat=asteps)
 
 function probe_network(p)
     solution = solve(remake(ivp, p=p), Tsit5(), saveat=asteps, sensealg=QuadratureAdjoint(autojacvec=ZygoteVJP()))
@@ -58,10 +57,18 @@ function loss(p)
     return sum(loss_series.(probe_network(p), training_data))
 end
 
-loss(p)
+### LEARNING RATE DECAY
+step_iterations = 600
+decay_max = 4000
+decay_rate = 2000
+α = log(10) / decay_rate
+decay(x) = exp(-α * x)
+decay_amounts = decay.(0:step_iterations:decay_max);
+learning_rates = LEARNING_RATE .* decay_amounts
 
 ### TRAINING
-losses = [];
+losses = Float64[];
+
 callback = function (p, l)
     push!(losses, l)
     println("Current loss after $(length(losses)) iterations: $(losses[end])")
@@ -69,12 +76,24 @@ callback = function (p, l)
 end
 
 optf = Optimization.OptimizationFunction((x, p) -> loss(x), Optimization.AutoForwardDiff());
-optprob = Optimization.OptimizationProblem(optf, ComponentVector{Float64}(p));
-result_node1 = Optimization.solve(optprob, ADAM(LEARNING_RATE), callback=callback, maxiters=ITERATIONS);
-optprob2 = remake(optprob,u0 = result_node1.u);
-result_node2 = Optimization.solve(optprob2, ADAM(0.0003), callback=callback, maxiters=300);
-optprob3 = remake(optprob,u0 = result_node2.u);
-result_node3 = Optimization.solve(optprob3, BFGS(initial_stepnorm=0.0001), callback=callback, allow_f_increases = false);
+
+function train_network(optf, p0, rates, step_iters)
+    ps = p0
+    for rate in rates
+        println("Learning rate: $(rate)")
+        optprob = Optimization.OptimizationProblem(optf, ps)
+        result = Optimization.solve(optprob, ADAM(rate), callback=callback, maxiters=step_iters);
+        ps = result.u
+    end
+
+    println("BFGS")
+    optprob = Optimization.OptimizationProblem(optf, ps)
+    result = Optimization.solve(optprob, BFGS(initial_stepnorm=last(rates)), callback=callback, allow_f_increases = false);
+
+    return result
+end
+
+result_node = train_network(optf, ComponentVector{Float64}(p), learning_rates, step_iterations);
 
 ### EXTRAS
 function check_network(result)
@@ -97,5 +116,5 @@ function plot_loss(values)
     display(Plots.plot(plt))
 end
 
-check_network(result_node3)
+check_network(result_node)
 plot_loss(losses)

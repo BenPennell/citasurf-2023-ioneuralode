@@ -1,10 +1,10 @@
-using OrdinaryDiffEq, Optimization, OptimizationOptimisers, OptimizationOptimJL
+using OrdinaryDiffEq, Optimization, OptimizationOptimisers
 using ComponentArrays, Lux, Plots, StableRNGs, JSON
 
 ### HYPERPARAMETERS
 RNG_SEED::Int = 1112
 NETWORK_SIZE::Int = 25
-LEARNING_RATE::Float64 = 0.005
+LEARNING_RATE::Float64 = 0.01
 ITERATIONS::Int = 200
 
 rng = StableRNG(RNG_SEED);
@@ -53,8 +53,20 @@ function loss(p)
     return sum(loss_series.(probe_network(p), training_data))
 end
 
+### LEARNING RATE DECAY
+step_iterations = 100
+decay_max = 1000
+decay_rate = 500
+α = log(10) / 300
+decay(x) = exp(-α * x)
+decay_amounts = decay.(0:step_iterations:decay_max);
+learning_rates = LEARNING_RATE .* decay_amounts
+plot(learning_rates)
+
+learning_rates
 ### TRAINING
-losses = [];
+losses = Float64[];
+
 callback = function (p, l)
     push!(losses, l)
     println("Current loss after $(length(losses)) iterations: $(losses[end])")
@@ -62,12 +74,21 @@ callback = function (p, l)
 end
 
 optf = Optimization.OptimizationFunction((x, p) -> loss(x), Optimization.AutoForwardDiff());
-optprob = Optimization.OptimizationProblem(optf, ComponentVector{Float64}(p));
-result_node1 = Optimization.solve(optprob, ADAM(LEARNING_RATE), callback=callback, maxiters=ITERATIONS);
-optprob2 = remake(optprob,u0 = result_node1.u);
-result_node2 = Optimization.solve(optprob2, ADAM(0.0003), callback=callback, maxiters=300);
-optprob3 = remake(optprob,u0 = result_node2.u);
-result_node3 = Optimization.solve(optprob3, BFGS(initial_stepnorm=0.0001), callback=callback, allow_f_increases = false);
+
+function train_network(optf, p0, rates, step_iters)
+    ps = p0
+    result = nothing
+    for rate in rates
+        println("Learning rate: $(rate)")
+        optprob = Optimization.OptimizationProblem(optf, ps)
+        result = Optimization.solve(optprob, ADAM(rate), callback=callback, maxiters=step_iters)
+        ps = result.u
+    end
+
+    return result
+end
+
+result_node = train_network(optf, ComponentVector{Float64}(p), learning_rates, step_iterations);
 
 ### EXTRAS
 function check_network(result)
@@ -90,5 +111,5 @@ function plot_loss(values)
     display(Plots.plot(plt))
 end
 
-check_network(result_node3)
+check_network(result_node)
 plot_loss(losses)
