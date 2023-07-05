@@ -32,7 +32,7 @@ network_u = Lux.Chain(Lux.Dense(4, NETWORK_SIZE, tanh),
 p, st = Lux.setup(rng, network_u);
 
 function ude(u, p, t)
-    û = network_u(SA[u[1], u[2], u[3], t], p, st)[1] .* [characteristic_ascale, characteristic_ascale, characteristic_ascale]  # Scale to datascale
+    û = network_u(SA[u[1], u[2], u[3], t], p, st)[1] .* characteristic_ascale  # Scale to datascale
     du1 = u[1] + û[1]
     du2 = u[2] + û[2]
     du3 = u[3] + û[3]
