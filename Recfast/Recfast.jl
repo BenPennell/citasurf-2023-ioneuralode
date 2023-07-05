@@ -4,7 +4,7 @@ using Zygote, StaticArrays
 
 ### HYPERPARAMETERS
 RNG_SEED::Int = 1112
-NETWORK_SIZE::Int = 10
+NETWORK_SIZE::Int = 20
 LEARNING_RATE::Float64 = 0.005
 ITERATIONS::Int = 200
 
@@ -32,7 +32,7 @@ network_u = Lux.Chain(Lux.Dense(4, NETWORK_SIZE, tanh),
 p, st = Lux.setup(rng, network_u);
 
 function ude(u, p, t)
-    û = network_u(SA[u[1], u[2], u[3], t], p, st)[1] .* [characteristic_ascale, characteristic_ascale*10, characteristic_ascale]  # Scale to datascale
+    û = network_u(SA[u[1], u[2], u[3], t], p, st)[1] .* [characteristic_ascale, characteristic_ascale, characteristic_ascale]  # Scale to datascale
     du1 = u[1] + û[1]
     du2 = u[2] + û[2]
     du3 = u[3] + û[3]
@@ -58,20 +58,22 @@ function loss(p)
 end
 
 ### LEARNING RATE DECAY
-step_iterations = 600
-decay_max = 4000
-decay_rate = 2000
-α = log(10) / decay_rate
-decay(x) = exp(-α * x)
-decay_amounts = decay.(0:step_iterations:decay_max);
+step_iterations = 200
+step_size = 0.3
+step_max = 2π
+decay(x) = cos(x % π/2) # Only get first quadrant
+decay_amounts = decay.(0:step_size:step_max);
 learning_rates = LEARNING_RATE .* decay_amounts
+plot(learning_rates)
 
 ### TRAINING
 losses = Float64[];
 
 callback = function (p, l)
     push!(losses, l)
-    println("Current loss after $(length(losses)) iterations: $(losses[end])")
+    if (length(losses) - 1) % 25 == 0
+        println("Current loss after $(length(losses)) iterations: $(losses[end])")
+    end
     return false
 end
 
@@ -79,17 +81,13 @@ optf = Optimization.OptimizationFunction((x, p) -> loss(x), Optimization.AutoFor
 
 function train_network(optf, p0, rates, step_iters)
     ps = p0
+    result = nothing
     for rate in rates
         println("Learning rate: $(rate)")
         optprob = Optimization.OptimizationProblem(optf, ps)
         result = Optimization.solve(optprob, ADAM(rate), callback=callback, maxiters=step_iters);
         ps = result.u
     end
-
-    println("BFGS")
-    optprob = Optimization.OptimizationProblem(optf, ps)
-    result = Optimization.solve(optprob, BFGS(initial_stepnorm=last(rates)), callback=callback, allow_f_increases = false);
-
     return result
 end
 
@@ -117,4 +115,5 @@ function plot_loss(values)
 end
 
 check_network(result_node)
+savefig("RecfastRecombination.png")
 plot_loss(losses)
