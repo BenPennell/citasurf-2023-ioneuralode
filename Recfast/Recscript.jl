@@ -112,7 +112,7 @@ function main(args)
             optprob = Optimization.OptimizationProblem(optf, ps)
             result = Optimization.solve(optprob, ADAM(rate), callback=callback, maxiters=step_iters);
             ps = result.u
-            jldsave("$(out_folder)/$(ar["NAME"])_$(rate)_checkpoint"; ps)
+            jldsave("$(out_folder)/$(ar["NAME"])_$(length(losses))_checkpoint"; ps)
             push!(checkpoint_losses, last(losses))
         end
     end
