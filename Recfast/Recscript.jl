@@ -28,19 +28,20 @@ function main(args)
         "--DECAY"
             nargs = 4
             arg_type = Float64
-            default = [0, 0.2, 2π, 200] # Cosine Schedule: Min, Step Size, Max, Step Iterations
+            default = [0, 0.1, 3π, 200] # Cosine Schedule: Min, Step Size, Max, Step Iterations
+        "--OUTPUT"
+            nargs = '?'
+            arg_type = String
+            default = "./output"
     end
 
     ar = parse_args(s)
     rng = StableRNG(ar["SEED"]);
 
     # Where the output is saved to
+    out_folder = "$(ar["OUTPUT"])/$(ar["NAME"])"
     try
-        mkdir("./output")
-    catch
-    end
-    try
-        mkdir("./output/$(ar["NAME"])")
+        mkdir(out_folder)
     catch
     end
 
@@ -111,7 +112,7 @@ function main(args)
             optprob = Optimization.OptimizationProblem(optf, ps)
             result = Optimization.solve(optprob, ADAM(rate), callback=callback, maxiters=step_iters);
             ps = result.u
-            jldsave("./output/$(ar["NAME"])/$(ar["NAME"])_$(rate)_checkpoint"; ps)
+            jldsave("$(out_folder)/$(ar["NAME"])_$(rate)_checkpoint"; ps)
             push!(checkpoint_losses, last(losses))
         end
     end
@@ -119,7 +120,7 @@ function main(args)
     train_network(optf, ComponentVector{Float64}(p), learning_rates, Int(ar["DECAY"][4]));
 
     ### SAVING
-    logfile = open("./output/$(ar["NAME"])/$(ar["NAME"])_log.txt", "w")
+    logfile = open("$(out_folder)/$(ar["NAME"])_log.txt", "w")
     write(logfile, """
                     NAME: $(ar["NAME"])
                     SOURCE: $(ar["INPUT"])
