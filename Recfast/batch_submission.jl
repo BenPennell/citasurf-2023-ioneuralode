@@ -8,9 +8,6 @@ outfolder_directory = "./Recfast_Batches"
 rands = 1001:1:1500
 sizes = [5, 20, 60]
 
-#fixed
-decay = "0 1 3 100"
-
 for seed in rands
     for size in sizes
         name = "$(size)_$(seed)"
@@ -24,9 +21,10 @@ for seed in rands
         #PBS -q starq
 
         cd $(base_directory)
-        julia -t 2 --project=$(project_directory) $(script_directory) --INPUT $(data_directory) --SIZE $(size) --DECAY $(decay) --OUTPUT $(outfolder_directory) --NAME $(name)
+        julia -t 2 --project=$(project_directory) $(script_directory) --INPUT $(data_directory) --SIZE $(size) --SEED $(seed) --DECAY $(decay) --OUTPUT $(outfolder_directory) --NAME $(name)
                     """
         scriptfile = joinpath(base_directory, dump_directory, name)
         open(scriptfile, "w") do file write(file, PBS_script) end
-        run(`qsub $scriptfile`)          
+        run(`qsub $scriptfile`)
+    end          
 end
