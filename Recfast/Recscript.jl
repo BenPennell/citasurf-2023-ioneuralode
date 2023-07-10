@@ -6,13 +6,11 @@ function main(args)
 
     @add_arg_table! s begin
         "--NAME"
-            nargs = "?"
+            nargs = 1
             arg_type = String
-            default = "Recfast_Network"
         "--INPUT"
-            nargs = '?'
+            nargs = 1
             arg_type = String
-            default = "./RecfastData.json"
         "--SEED"
             nargs = '?'
             arg_type = Int
@@ -28,25 +26,24 @@ function main(args)
         "--DECAY"
             nargs = 4
             arg_type = Float64
-            default = [0, 0.1, 3π, 200] # Cosine Schedule: Min, Step Size, Max, Step Iterations
+            default = [0, 0.1, 9.4, 200] # Cosine Schedule: Min, Step Size, Max, Step Iterations
         "--OUTPUT"
-            nargs = '?'
+            nargs = 1
             arg_type = String
-            default = "./output"
     end
 
     ar = parse_args(s)
     rng = StableRNG(ar["SEED"]);
 
     # Where the output is saved to
-    out_folder = "$(ar["OUTPUT"])/$(ar["NAME"])"
+    out_folder = "$(ar["OUTPUT"][1])/$(ar["NAME"][1])"
     try
         mkdir(out_folder)
     catch
     end
 
     ### DATA
-    data = JSON.parsefile(ar["INPUT"]); # He, a, H, T4
+    data = JSON.parsefile(ar["INPUT"][1]); # He, a, H, T4
     original_data = [ Float64.(data[s]) for s in ("H", "He", "T4") ];
 
     norm_consts = first.(maximum!.([[1.,]], original_data));
@@ -112,7 +109,7 @@ function main(args)
             optprob = Optimization.OptimizationProblem(optf, ps)
             result = Optimization.solve(optprob, ADAM(rate), callback=callback, maxiters=step_iters);
             ps = result.u
-            jldsave("$(out_folder)/$(ar["NAME"])_$(length(losses))_checkpoint"; ps)
+            jldsave("$(out_folder)/$(ar["NAME"][1])_$(length(losses))_checkpoint"; ps)
             push!(checkpoint_losses, last(losses))
         end
     end
@@ -120,10 +117,10 @@ function main(args)
     train_network(optf, ComponentVector{Float64}(p), learning_rates, Int(ar["DECAY"][4]));
 
     ### SAVING
-    logfile = open("$(out_folder)/$(ar["NAME"])_log.txt", "w")
+    logfile = open("$(out_folder)/$(ar["NAME"][1])_log.txt", "w")
     write(logfile, """
-                    NAME: $(ar["NAME"])
-                    SOURCE: $(ar["INPUT"])
+                    NAME: $(ar["NAME"][1])
+                    SOURCE: $(ar["INPUT"][1])
                     TIMESTAMP: $(now())
                     SEED: $(ar["SEED"])
                     WIDTH: $(ar["WIDTH"])
@@ -134,7 +131,7 @@ function main(args)
                     """)
     close(logfile)
 
-    lossfile = open("./output/$(ar["NAME"])/$(ar["NAME"])_loss.txt","w")
+    lossfile = open("$(out_folder)/$(ar["NAME"][1])_loss.txt","w")
     write(lossfile, join(losses, "\n"))
     close(lossfile)
     
